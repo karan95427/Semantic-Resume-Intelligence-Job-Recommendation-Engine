@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "title": "Machine Learning Engineer",
+    "description": "Python, TensorFlow,NLP, FastAPI, embeddings"
+  },
+  {
+    "id": 2,
+    "title": "Backend Python Developer",
+    "description": "FastAPI, PostgreSQL, REST APIs, Docker"
+  },
+  {
+    "id": 3,
+    "title": "Data Scientist",
+    "description": "Pandas, NumPy, Machine Learning, Visualization"
+  }
+]
