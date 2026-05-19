@@ -2,3 +2,4 @@ venv
 hf_cache/
 __pycache__/
 data/uploads/
+Memory.md
