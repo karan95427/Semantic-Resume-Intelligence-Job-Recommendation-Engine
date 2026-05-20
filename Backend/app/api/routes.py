@@ -1,36 +1,34 @@
 from pathlib import Path
 
-from fastapi import APIRouter,UploadFile, File ,Form    
+from fastapi import APIRouter, File, Form, UploadFile
 
-from ..models.schemas import MatchRequest, MatchResponse, RecommendationResponse
+from ..models.schemas import RecommendationResponse
 from ..services.embedding_service import generate_embedding
-from ..services.similarity_service import calculate_similarity
 from ..services.parser_service import extract_text_from_pdf
 from ..services.recommendation_service import load_jobs, recommend_jobs
+from ..services.similarity_service import calculate_similarity
 
 
 router = APIRouter()
 UPLOAD_DIR = Path(__file__).resolve().parents[2] / "data" / "uploads"
 
+
 @router.get("/embedding")
 def embedding_test():
-
     text = "Python FastAPI Machine Learning"
-
     embedding = generate_embedding(text)
 
     return {
-     
         "embedding_length": len(embedding),
-        "sample": embedding[:5]
+        "sample": embedding[:5],
     }
+
 
 @router.post("/resume-match")
 async def resume_match(
     file: UploadFile = File(...),
-    job_description: str = Form(...)
+    job_description: str = Form(...),
 ):
-
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     file_path = UPLOAD_DIR / file.filename
 
@@ -41,7 +39,7 @@ async def resume_match(
 
     result = calculate_similarity(
         resume_text,
-        job_description
+        job_description,
     )
 
     return {
@@ -56,7 +54,6 @@ async def job_recommendations(
     file: UploadFile = File(...),
     top_k: int = Form(3),
 ):
-
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     file_path = UPLOAD_DIR / file.filename
 
