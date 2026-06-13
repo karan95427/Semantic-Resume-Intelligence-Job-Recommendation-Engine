@@ -4,4 +4,8 @@ __pycache__/
 data/uploads/
 Memory.md
 data
-Backend\data\jobs
+Backend/data/jobs
+Future_Plan/
+.env
+backend_server.out.log
+backend_server.err.log

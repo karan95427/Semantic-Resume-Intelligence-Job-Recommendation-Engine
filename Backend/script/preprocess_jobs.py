@@ -14,6 +14,7 @@ RAW_DATA_CANDIDATES = [
 ]
 
 OUTPUT_PATH = BACKEND_DIR / "data" / "jobs" / "jobs.json"
+MAPPING_OUTPUT_PATH = BACKEND_DIR / "data" / "jobs" / "job_mapping.json"
 TEXT_COLUMNS = ["title", "company", "location", "description"]
 REQUIRED_TEXT_COLUMNS = ["title", "description"]
 MOJIBAKE_REPLACEMENTS = {
@@ -149,10 +150,18 @@ for job_id, row in enumerate(df.itertuples(index=False), start=0):
         }
     )
 
+job_mapping = {
+    str(index): job["id"]
+    for index, job in enumerate(jobs)
+}
+
 OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 with open(OUTPUT_PATH, "w", encoding="utf-8") as file:
     json.dump(jobs, file, indent=4, ensure_ascii=False)
+with open(MAPPING_OUTPUT_PATH, "w", encoding="utf-8") as file:
+    json.dump(job_mapping, file, indent=4, ensure_ascii=False)
 
 print("\nDataset preprocessing completed.")
 print(f"Clean jobs saved: {len(jobs)}")
 print(f"Output path: {OUTPUT_PATH}")
+print(f"Mapping path: {MAPPING_OUTPUT_PATH}")

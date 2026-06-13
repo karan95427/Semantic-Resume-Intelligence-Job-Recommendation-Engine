@@ -8,6 +8,7 @@ import faiss
 import numpy as np
 
 from .embedding_service import generate_embedding
+from .job_mapping_service import ensure_job_mapping
 
 
 INDEX_FILE = Path(__file__).resolve().parents[2] / "data" / "jobs" / "jobs.index"
@@ -19,6 +20,15 @@ _INDEX_CACHE: dict[str, Any] = {
     "jobs": None,
     "embeddings": None,
 }
+
+
+def _normalize_embeddings(embeddings: np.ndarray) -> np.ndarray:
+    if embeddings.size == 0:
+        return embeddings
+
+    normalized = np.array(embeddings, dtype="float32", copy=True)
+    faiss.normalize_L2(normalized)
+    return normalized
 
 
 def _jobs_signature(jobs: list[dict]) -> tuple[tuple[Any, ...], ...]:
@@ -60,6 +70,9 @@ def _load_index_from_disk(
     except (OSError, json.JSONDecodeError):
         return None
 
+    if metadata.get("metric") != "ip" or not metadata.get("normalized", False):
+        return None
+
     stored_signature = tuple(
         tuple(item) for item in metadata.get("signature", [])
     )
@@ -98,7 +111,11 @@ def _save_index_to_disk(
     faiss.write_index(index, str(INDEX_FILE))
     INDEX_META_FILE.write_text(
         json.dumps(
-            {"signature": _signature_to_serializable(signature)},
+            {
+                "signature": _signature_to_serializable(signature),
+                "metric": "ip",
+                "normalized": True,
+            },
             ensure_ascii=True,
             indent=2,
         ),
@@ -125,8 +142,9 @@ def build_faiss_index(jobs: list[dict]) -> dict[str, Any]:
     if embedding_matrix.size == 0:
         index = None
     else:
+        embedding_matrix = _normalize_embeddings(embedding_matrix)
         dimension = embedding_matrix.shape[1]
-        index = faiss.IndexFlatL2(dimension)
+        index = faiss.IndexFlatIP(dimension)
         index.add(embedding_matrix)
         _save_index_to_disk(index=index, signature=signature)
 
@@ -150,22 +168,33 @@ def search_similar_jobs(
     bundle = build_faiss_index(jobs)
     index = bundle["index"]
     embeddings = bundle["embeddings"]
+    job_mapping = ensure_job_mapping(jobs)
 
     if index is None or top_k <= 0:
         return []
 
     normalized_top_k = min(top_k, len(jobs))
     query_vector = np.asarray([resume_embedding], dtype="float32")
+    faiss.normalize_L2(query_vector)
 
     distances, indices = index.search(query_vector, normalized_top_k)
 
     results = []
     should_reconstruct = embeddings is None
+    jobs_by_id = {
+        job.get("id"): job
+        for job in jobs
+    }
     for distance, index_position in zip(distances[0], indices[0]):
         if index_position < 0:
             continue
 
-        job = jobs[index_position]
+        mapped_job_id = job_mapping.get(str(int(index_position)))
+        job = jobs_by_id.get(mapped_job_id)
+        if job is None:
+            if index_position >= len(jobs):
+                continue
+            job = jobs[index_position]
         if should_reconstruct:
             job_embedding = index.reconstruct(int(index_position)).tolist()
         else:

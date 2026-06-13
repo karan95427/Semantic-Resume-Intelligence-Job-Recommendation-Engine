@@ -1,21 +1,13 @@
-import json
-from pathlib import Path
-
 from .embedding_service import generate_embedding
 from .faiss_service import search_similar_jobs
+from .job_mapping_service import ensure_job_mapping
+from ..repositories.job_repository import list_jobs
 from .matching_engine import score_job
 
 
-JOBS_FILE = Path(__file__).resolve().parents[2] / "data" / "jobs" / "jobs.json"
-
-
 def load_jobs() -> list[dict]:
-    with JOBS_FILE.open("r", encoding="utf-8") as file:
-        jobs = json.load(file)
-
-    if not isinstance(jobs, list):
-        raise ValueError("jobs.json must contain a list of jobs")
-
+    jobs = list_jobs()
+    ensure_job_mapping(jobs)
     return jobs
 
 
@@ -46,6 +38,7 @@ def recommend_jobs(resume_text: str, top_k: int = 3) -> list[dict]:
                 "title": job["title"],
                 "description": job_description,
                 "match_score": score["match_score"],
+                "match_label": score["match_label"],
                 "semantic_score": score["semantic_score"],
                 "skill_match_score": score["skill_match_score"],
                 "matched_skills": score["matched_skills"],

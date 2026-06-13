@@ -8,6 +8,8 @@ from .skill_extractor_service import extract_skills
 
 SEMANTIC_WEIGHT = 0.7
 SKILL_WEIGHT = 0.3
+STRONG_MATCH_MIN_SCORE = 85.0
+MODERATE_MATCH_MIN_SCORE = 70.0
 
 
 def calculate_semantic_score(
@@ -56,6 +58,14 @@ def calculate_final_score(
     )
 
 
+def determine_match_label(final_score: float) -> str:
+    if final_score >= STRONG_MATCH_MIN_SCORE:
+        return "Strong Match"
+    if final_score >= MODERATE_MATCH_MIN_SCORE:
+        return "Moderate Match"
+    return "Low Match"
+
+
 def score_job(
     resume_text: str,
     job_text: str,
@@ -77,9 +87,11 @@ def score_job(
         semantic_score=semantic_score,
         skill_match_score=skill_details["skill_match_score"],
     )
+    match_label = determine_match_label(final_score)
 
     return {
         "match_score": final_score,
+        "match_label": match_label,
         "semantic_score": semantic_score,
         "skill_match_score": skill_details["skill_match_score"],
         "matched_skills": skill_details["matched_skills"],
@@ -88,7 +100,6 @@ def score_job(
         "job_skills": skill_details["job_skills"],
         "final_score": final_score,
     }
-
 
 def score_job_from_texts(
     resume_text: str,

@@ -4,6 +4,7 @@ from fastapi import APIRouter, File, Form, UploadFile
 
 from ..models.schemas import RecommendationResponse
 from ..services.embedding_service import generate_embedding
+from ..services.explanation_service import explain_recommendations
 from ..services.parser_service import extract_text_from_pdf
 from ..services.recommendation_service import load_jobs, recommend_jobs
 from ..services.similarity_service import calculate_similarity
@@ -45,14 +46,20 @@ async def resume_match(
     return {
         "filename": file.filename,
         "match_score": result["match_score"],
+        "match_label": result["match_label"],
         "extracted_text_preview": resume_text[:500],
     }
 
 
-@router.post("/job-recommendations", response_model=RecommendationResponse)
+@router.post(
+    "/job-recommendations",
+    response_model=RecommendationResponse,
+    response_model_exclude_none=True,
+)
 async def job_recommendations(
     file: UploadFile = File(...),
     top_k: int = Form(3),
+    explain: bool = Form(False),
 ):
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     file_path = UPLOAD_DIR / file.filename
@@ -67,6 +74,11 @@ async def job_recommendations(
         resume_text,
         top_k=normalized_top_k,
     )
+    if explain:
+        recommendations = explain_recommendations(
+            recommendations,
+            resume_text=resume_text,
+        )
 
     return {
         "filename": file.filename,

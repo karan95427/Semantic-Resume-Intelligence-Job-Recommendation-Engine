@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import io
+import os
 import sys
 import tempfile
 import types
@@ -31,6 +32,7 @@ class ApiRouteTests(unittest.TestCase):
             "Backend.app.services.recommendation_service",
             "Backend.app.services.matching_engine",
             "Backend.app.services.similarity_service",
+            "Backend.app.services.explanation_service",
             "Backend.app.api.routes",
             "Backend.app.main",
         ]:
@@ -47,6 +49,7 @@ class ApiRouteTests(unittest.TestCase):
             "Backend.app.services.matching_engine",
             "Backend.app.services.recommendation_service",
             "Backend.app.services.faiss_service",
+            "Backend.app.services.explanation_service",
         ]:
             sys.modules.pop(module_name, None)
 
@@ -64,6 +67,10 @@ class ApiRouteTests(unittest.TestCase):
     def test_embedding_route_returns_embedding_metadata(self) -> None:
         with patch.object(
             self.main_module,
+            "init_database",
+            return_value=None,
+        ), patch.object(
+            self.main_module,
             "ensure_faiss_index",
             return_value={"index": None, "jobs": [], "embeddings": None},
         ), patch.object(self.main_module, "load_jobs", return_value=[]):
@@ -79,6 +86,10 @@ class ApiRouteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="api-upload-") as temp_dir:
             with patch.object(
                 self.main_module,
+                "init_database",
+                return_value=None,
+            ), patch.object(
+                self.main_module,
                 "ensure_faiss_index",
                 return_value={"index": None, "jobs": [], "embeddings": None},
             ), patch.object(self.main_module, "load_jobs", return_value=[]), patch(
@@ -91,6 +102,7 @@ class ApiRouteTests(unittest.TestCase):
                 "Backend.app.api.routes.calculate_similarity",
                 return_value={
                     "match_score": 91.5,
+                    "match_label": "Strong Match",
                     "semantic_score": 95.0,
                     "skill_match_score": 83.0,
                     "matched_skills": ["python", "sql"],
@@ -110,6 +122,7 @@ class ApiRouteTests(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["filename"], "resume.pdf")
         self.assertEqual(payload["match_score"], 91.5)
+        self.assertEqual(payload["match_label"], "Strong Match")
         self.assertIn("Python FastAPI SQL resume", payload["extracted_text_preview"])
 
     def test_job_recommendations_route_returns_ranked_results(self) -> None:
@@ -123,6 +136,7 @@ class ApiRouteTests(unittest.TestCase):
                 "title": "ML Engineer",
                 "description": "Machine learning",
                 "match_score": 96.2,
+                "match_label": "Strong Match",
                 "semantic_score": 98.0,
                 "skill_match_score": 92.0,
                 "matched_skills": ["python"],
@@ -132,6 +146,10 @@ class ApiRouteTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(prefix="api-upload-") as temp_dir:
             with patch.object(
+                self.main_module,
+                "init_database",
+                return_value=None,
+            ), patch.object(
                 self.main_module,
                 "ensure_faiss_index",
                 return_value={"index": None, "jobs": fake_jobs, "embeddings": None},
@@ -151,6 +169,9 @@ class ApiRouteTests(unittest.TestCase):
             ), patch(
                 "Backend.app.api.routes.recommend_jobs",
                 return_value=fake_recommendations,
+            ), patch.dict(
+                os.environ,
+                {"OPENAI_API_KEY": ""},
             ):
                 with TestClient(self.main_module.app) as client:
                     response = client.post(
@@ -167,6 +188,75 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(payload["total_jobs_compared"], 2)
         self.assertEqual(len(payload["recommendations"]), 1)
         self.assertEqual(payload["recommendations"][0]["id"], 2)
+        self.assertEqual(payload["recommendations"][0]["match_label"], "Strong Match")
+        self.assertNotIn("explanation", payload["recommendations"][0])
+
+    def test_job_recommendations_route_can_add_explanations_without_changing_scores(self) -> None:
+        fake_jobs = [
+            {"id": 1, "title": "Backend Engineer", "description": "Python APIs"},
+            {"id": 2, "title": "ML Engineer", "description": "Machine learning"},
+        ]
+        fake_recommendations = [
+            {
+                "id": 2,
+                "title": "ML Engineer",
+                "description": "Machine learning",
+                "match_score": 96.2,
+                "match_label": "Strong Match",
+                "semantic_score": 98.0,
+                "skill_match_score": 92.0,
+                "matched_skills": ["python"],
+                "missing_skills": ["docker"],
+            }
+        ]
+
+        with tempfile.TemporaryDirectory(prefix="api-upload-") as temp_dir:
+            with patch.object(
+                self.main_module,
+                "init_database",
+                return_value=None,
+            ), patch.object(
+                self.main_module,
+                "ensure_faiss_index",
+                return_value={"index": None, "jobs": fake_jobs, "embeddings": None},
+            ), patch.object(
+                self.main_module,
+                "load_jobs",
+                return_value=fake_jobs,
+            ), patch(
+                "Backend.app.api.routes.UPLOAD_DIR",
+                Path(temp_dir),
+            ), patch(
+                "Backend.app.api.routes.extract_text_from_pdf",
+                return_value="resume text",
+            ), patch(
+                "Backend.app.api.routes.load_jobs",
+                return_value=fake_jobs,
+            ), patch(
+                "Backend.app.api.routes.recommend_jobs",
+                return_value=fake_recommendations,
+            ), patch.dict(
+                os.environ,
+                {"OPENAI_API_KEY": ""},
+            ):
+                with TestClient(self.main_module.app) as client:
+                    response = client.post(
+                        "/job-recommendations",
+                        files={
+                            "file": ("resume.pdf", io.BytesIO(b"fake pdf"), "application/pdf")
+                        },
+                        data={"top_k": "5", "explain": "true"},
+                    )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        recommendation = payload["recommendations"][0]
+        self.assertEqual(recommendation["id"], 2)
+        self.assertEqual(recommendation["match_score"], 96.2)
+        self.assertEqual(recommendation["semantic_score"], 98.0)
+        self.assertEqual(recommendation["skill_match_score"], 92.0)
+        self.assertEqual(recommendation["explanation"]["source"], "fallback")
+        self.assertEqual(recommendation["explanation"]["missing_skills"], ["docker"])
 
 
 if __name__ == "__main__":

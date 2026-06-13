@@ -57,6 +57,19 @@ class MatchingEngineTests(unittest.TestCase):
         self.assertEqual(result["missing_skills"], ["nlp"])
         self.assertEqual(result["skill_match_score"], 66.67)
 
+    def test_calculate_skill_details_normalizes_skill_aliases(self) -> None:
+        result = self.matching_engine.calculate_skill_details(
+            resume_text="Built ML systems with Postgres and REST API design",
+            job_text="Need machine learning, postgresql, and rest apis experience",
+        )
+
+        self.assertEqual(
+            result["matched_skills"],
+            ["machine learning", "postgresql", "rest apis"],
+        )
+        self.assertEqual(result["missing_skills"], [])
+        self.assertEqual(result["skill_match_score"], 100.0)
+
     def test_score_job_uses_weighted_semantic_and_skill_scores(self) -> None:
         result = self.matching_engine.score_job(
             resume_text="Python FastAPI machine learning",
@@ -64,6 +77,7 @@ class MatchingEngineTests(unittest.TestCase):
         )
 
         self.assertIn("match_score", result)
+        self.assertIn("match_label", result)
         self.assertIn("semantic_score", result)
         self.assertIn("skill_match_score", result)
         self.assertEqual(result["missing_skills"], ["nlp"])
@@ -72,6 +86,21 @@ class MatchingEngineTests(unittest.TestCase):
             result["match_score"],
             result["final_score"],
             places=2,
+        )
+        self.assertEqual(result["match_label"], "Moderate Match")
+
+    def test_determine_match_label_uses_score_bands(self) -> None:
+        self.assertEqual(
+            self.matching_engine.determine_match_label(92.0),
+            "Strong Match",
+        )
+        self.assertEqual(
+            self.matching_engine.determine_match_label(75.0),
+            "Moderate Match",
+        )
+        self.assertEqual(
+            self.matching_engine.determine_match_label(62.0),
+            "Low Match",
         )
 
     def test_similarity_service_returns_api_friendly_payload(self) -> None:
@@ -84,6 +113,7 @@ class MatchingEngineTests(unittest.TestCase):
             sorted(result.keys()),
             [
                 "final_score",
+                "match_label",
                 "match_score",
                 "matched_skills",
                 "semantic_score",
@@ -91,6 +121,18 @@ class MatchingEngineTests(unittest.TestCase):
             ],
         )
         self.assertEqual(result["matched_skills"], ["machine learning", "python"])
+        self.assertEqual(result["match_label"], "Moderate Match")
+
+    def test_similarity_service_uses_canonical_skill_names(self) -> None:
+        result = self.similarity_service.calculate_similarity(
+            "ML with Postgres and REST API integrations",
+            "Looking for machine learning, postgresql, and rest apis",
+        )
+
+        self.assertEqual(
+            result["matched_skills"],
+            ["machine learning", "postgresql", "rest apis"],
+        )
 
 
 if __name__ == "__main__":

@@ -8,6 +8,10 @@ import tempfile
 import types
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+import faiss
+import numpy as np
 
 
 def _embedding_values(text: str) -> list[float]:
@@ -21,11 +25,18 @@ def _embedding_values(text: str) -> list[float]:
     ]
 
 
+def _normalized_embedding_values(text: str) -> list[float]:
+    vector = np.asarray([_embedding_values(text)], dtype="float32")
+    faiss.normalize_L2(vector)
+    return vector[0].tolist()
+
+
 class FaissPersistenceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = Path(tempfile.mkdtemp(prefix="faiss-persist-"))
         self.index_file = self.temp_dir / "jobs.index"
         self.meta_file = self.temp_dir / "jobs.index.meta.json"
+        self.mapping_file = self.temp_dir / "job_mapping.json"
         self.embedding_calls: list[str] = []
 
         fake_embedding_module = types.ModuleType(
@@ -50,6 +61,9 @@ class FaissPersistenceTests(unittest.TestCase):
         )
         self.faiss_service.INDEX_FILE = self.index_file
         self.faiss_service.INDEX_META_FILE = self.meta_file
+        self.faiss_service.ensure_job_mapping.__globals__["JOB_MAPPING_FILE"] = (
+            self.mapping_file
+        )
         self.faiss_service._INDEX_CACHE.update(
             {
                 "signature": None,
@@ -105,6 +119,39 @@ class FaissPersistenceTests(unittest.TestCase):
             metadata["signature"],
             [list(item) for item in self.faiss_service._jobs_signature(self.jobs)],
         )
+        self.assertEqual(metadata["metric"], "ip")
+        self.assertTrue(metadata["normalized"])
+
+    def test_search_uses_explicit_job_mapping_for_metadata(self) -> None:
+        self.faiss_service.build_faiss_index(self.jobs)
+        swapped_jobs = [self.jobs[1], self.jobs[0]]
+        explicit_mapping = {
+            "0": self.jobs[0]["id"],
+            "1": self.jobs[1]["id"],
+        }
+
+        with patch.object(
+            self.faiss_service,
+            "build_faiss_index",
+            return_value={
+                "index": self.faiss_service._INDEX_CACHE["index"],
+                "jobs": self.jobs,
+                "embeddings": self.faiss_service._INDEX_CACHE["embeddings"],
+            },
+        ), patch.object(
+            self.faiss_service,
+            "ensure_job_mapping",
+            return_value=explicit_mapping,
+        ):
+            results = self.faiss_service.search_similar_jobs(
+                resume_embedding=_embedding_values(self.jobs[0]["description"]),
+                jobs=swapped_jobs,
+                top_k=1,
+            )
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["job"]["id"], 1)
+        self.assertEqual(results[0]["job"]["title"], "Python Developer")
 
     def test_existing_index_loads_without_reembedding(self) -> None:
         self.faiss_service.build_faiss_index(self.jobs)
@@ -136,7 +183,7 @@ class FaissPersistenceTests(unittest.TestCase):
         self.assertEqual(results[0]["job"]["id"], 1)
         self.assertEqual(
             results[0]["embedding"],
-            _embedding_values(self.jobs[0]["description"]),
+            _normalized_embedding_values(self.jobs[0]["description"]),
         )
 
     def test_signature_change_rebuilds_index(self) -> None:
