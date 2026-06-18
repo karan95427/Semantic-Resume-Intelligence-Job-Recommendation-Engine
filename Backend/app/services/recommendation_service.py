@@ -24,6 +24,7 @@ def recommend_jobs(resume_text: str, top_k: int = 3) -> list[dict]:
     for item in search_results:
         job = item["job"]
         job_description = job.get("description", "")
+        
         job_embedding = item["embedding"]
         score = score_job(
             resume_text=resume_text,
@@ -36,6 +37,8 @@ def recommend_jobs(resume_text: str, top_k: int = 3) -> list[dict]:
             {
                 "id": job["id"],
                 "title": job["title"],
+                "company": job.get("company"),
+                "location": job.get("location"),
                 "description": job_description,
                 "match_score": score["match_score"],
                 "match_label": score["match_label"],

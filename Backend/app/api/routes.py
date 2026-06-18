@@ -1,17 +1,37 @@
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, UploadFile
+from fastapi.responses import JSONResponse
 
 from ..models.schemas import RecommendationResponse
 from ..services.embedding_service import generate_embedding
 from ..services.explanation_service import explain_recommendations
 from ..services.parser_service import extract_text_from_pdf
 from ..services.recommendation_service import load_jobs, recommend_jobs
+from ..services.runtime_service import ensure_backend_ready, get_backend_status, trigger_backend_warmup
 from ..services.similarity_service import calculate_similarity
 
 
 router = APIRouter()
 UPLOAD_DIR = Path(__file__).resolve().parents[2] / "data" / "uploads"
+
+
+@router.get("/health")
+def health_check():
+    snapshot = get_backend_status()
+    return {
+        "status": "ok",
+        "service": "ai-job-matcher-api",
+        "ready": snapshot["ready"],
+    }
+
+
+@router.get("/ready")
+def readiness_check():
+    trigger_backend_warmup()
+    snapshot = get_backend_status()
+    status_code = 200 if snapshot["ready"] else 503
+    return JSONResponse(status_code=status_code, content=snapshot)
 
 
 @router.get("/embedding")
@@ -30,6 +50,7 @@ async def resume_match(
     file: UploadFile = File(...),
     job_description: str = Form(...),
 ):
+    ensure_backend_ready()
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     file_path = UPLOAD_DIR / file.filename
 
@@ -61,6 +82,7 @@ async def job_recommendations(
     top_k: int = Form(3),
     explain: bool = Form(False),
 ):
+    ensure_backend_ready()
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     file_path = UPLOAD_DIR / file.filename
 
@@ -85,4 +107,3 @@ async def job_recommendations(
         "total_jobs_compared": len(jobs),
         "recommendations": recommendations,
     }
-

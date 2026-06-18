@@ -1,11 +1,43 @@
-venv
+venv/
+.venv/
+env/
 hf_cache/
 __pycache__/
-data/uploads/
-Memory.md
-data
-Backend/data/jobs
-Future_Plan/
+*.py[cod]
+
+# Local secrets and environment files
 .env
+.env.*
+Backend/.env
+Backend/.env.*
+Frontend/.env
+Frontend/.env.*
+
+# Generated data and runtime artifacts
+data/uploads/
+Backend/data/uploads/
+Backend/data/resumes/
+data/raw/
+Backend/data/jobs/*.index
+Backend/data/jobs/*.meta.json
+Backend/data/jobs/*.log
+Backend/hf_cache/
+Backend/.pytest_cache/
+Backend/.mypy_cache/
+data/
+
+# Frontend dependencies and build output
+Frontend/node_modules/
+Frontend/dist/
+Frontend/.tanstack/
+
+# Logs and local notes
+*.log
 backend_server.out.log
 backend_server.err.log
+frontend_server.out.log
+frontend_server.err.log
+Memory.md
+Future_Plan/
+todo.txt
+

@@ -65,15 +65,10 @@ class ApiRouteTests(unittest.TestCase):
         return [float(len(text) + 1), 2.0, 3.0]
 
     def test_embedding_route_returns_embedding_metadata(self) -> None:
-        with patch.object(
-            self.main_module,
-            "init_database",
+        with patch(
+            "Backend.app.main.trigger_backend_warmup",
             return_value=None,
-        ), patch.object(
-            self.main_module,
-            "ensure_faiss_index",
-            return_value={"index": None, "jobs": [], "embeddings": None},
-        ), patch.object(self.main_module, "load_jobs", return_value=[]):
+        ):
             with TestClient(self.main_module.app) as client:
                 response = client.get("/embedding")
 
@@ -82,17 +77,66 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(payload["embedding_length"], 3)
         self.assertEqual(payload["sample"], [32.0, 2.0, 3.0])
 
+    def test_health_route_reports_process_health(self) -> None:
+        with patch(
+            "Backend.app.main.trigger_backend_warmup",
+            return_value=None,
+        ), patch(
+            "Backend.app.api.routes.get_backend_status",
+            return_value={"ready": False},
+        ):
+            with TestClient(self.main_module.app) as client:
+                response = client.get("/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "status": "ok",
+                "service": "ai-job-matcher-api",
+                "ready": False,
+            },
+        )
+
+    def test_ready_route_returns_503_while_warming(self) -> None:
+        snapshot = {
+            "status": "warming",
+            "ready": False,
+            "db_ready": False,
+            "index_ready": False,
+            "jobs_loaded": 0,
+            "warmup_in_progress": True,
+            "warmup_attempts": 1,
+            "warmup_started_at": "2026-06-18T00:00:00+00:00",
+            "warmup_completed_at": None,
+            "last_error": None,
+            "message": "Backend warmup is in progress.",
+        }
+        with patch(
+            "Backend.app.main.trigger_backend_warmup",
+            return_value=None,
+        ), patch(
+            "Backend.app.api.routes.trigger_backend_warmup",
+            return_value=None,
+        ), patch(
+            "Backend.app.api.routes.get_backend_status",
+            return_value=snapshot,
+        ):
+            with TestClient(self.main_module.app) as client:
+                response = client.get("/ready")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["message"], snapshot["message"])
+
     def test_resume_match_route_processes_uploaded_resume(self) -> None:
         with tempfile.TemporaryDirectory(prefix="api-upload-") as temp_dir:
-            with patch.object(
-                self.main_module,
-                "init_database",
+            with patch(
+                "Backend.app.main.trigger_backend_warmup",
                 return_value=None,
-            ), patch.object(
-                self.main_module,
-                "ensure_faiss_index",
-                return_value={"index": None, "jobs": [], "embeddings": None},
-            ), patch.object(self.main_module, "load_jobs", return_value=[]), patch(
+            ), patch(
+                "Backend.app.api.routes.ensure_backend_ready",
+                return_value=None,
+            ), patch(
                 "Backend.app.api.routes.UPLOAD_DIR",
                 Path(temp_dir),
             ), patch(
@@ -145,18 +189,12 @@ class ApiRouteTests(unittest.TestCase):
         ]
 
         with tempfile.TemporaryDirectory(prefix="api-upload-") as temp_dir:
-            with patch.object(
-                self.main_module,
-                "init_database",
+            with patch(
+                "Backend.app.main.trigger_backend_warmup",
                 return_value=None,
-            ), patch.object(
-                self.main_module,
-                "ensure_faiss_index",
-                return_value={"index": None, "jobs": fake_jobs, "embeddings": None},
-            ), patch.object(
-                self.main_module,
-                "load_jobs",
-                return_value=fake_jobs,
+            ), patch(
+                "Backend.app.api.routes.ensure_backend_ready",
+                return_value=None,
             ), patch(
                 "Backend.app.api.routes.UPLOAD_DIR",
                 Path(temp_dir),
@@ -211,18 +249,12 @@ class ApiRouteTests(unittest.TestCase):
         ]
 
         with tempfile.TemporaryDirectory(prefix="api-upload-") as temp_dir:
-            with patch.object(
-                self.main_module,
-                "init_database",
+            with patch(
+                "Backend.app.main.trigger_backend_warmup",
                 return_value=None,
-            ), patch.object(
-                self.main_module,
-                "ensure_faiss_index",
-                return_value={"index": None, "jobs": fake_jobs, "embeddings": None},
-            ), patch.object(
-                self.main_module,
-                "load_jobs",
-                return_value=fake_jobs,
+            ), patch(
+                "Backend.app.api.routes.ensure_backend_ready",
+                return_value=None,
             ), patch(
                 "Backend.app.api.routes.UPLOAD_DIR",
                 Path(temp_dir),

@@ -24,6 +24,8 @@ class RecommendationExplanation(BaseModel):
 class JobRecommendation(BaseModel):
     id: int
     title: str
+    company: str | None = None
+    location: str | None = None
     description: str
     match_score: float
     match_label: str
