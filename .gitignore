@@ -15,7 +15,8 @@ Frontend/.env.*
 
 # Generated data and runtime artifacts
 data/uploads/
-Backend/data/uploads/
+Backend/data/uploads/*
+!Backend/data/uploads/.gitkeep
 Backend/data/resumes/
 data/raw/
 Backend/data/jobs/*.index
