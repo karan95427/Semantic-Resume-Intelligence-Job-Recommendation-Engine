@@ -9,4 +9,4 @@
 
 [env]
   [env.production]
-    VITE_API_BASE_URL = "https://your-railway-backend-url.up.railway.app"
+    VITE_API_BASE_URL = "https://railway.com/project/841c0596-71dd-416b-92b6-ca7dec4b7a87/service/433f52e2-f2d4-4c35-8dfb-5c96f3928f9a?environmentId=9aad4153-e8d0-44ff-bef0-9e63afa34ec8.up.railway.app"
