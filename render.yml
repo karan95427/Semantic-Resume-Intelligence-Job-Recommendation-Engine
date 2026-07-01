@@ -4,7 +4,7 @@ services:
     runtime: python
     pythonVersion: 3.11
     rootDir: Backend
-    buildCommand: apt-get update && apt-get install -y build-essential gfortran libopenblas-dev && pip install -r requirements.txt
+    buildCommand: pip install -r requirements-prod.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000
     envVars:
       - key: DATABASE_URL
