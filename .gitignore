@@ -41,3 +41,22 @@ Memory.md
 Future_Plan/
 todo.txt
 
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Python build files
+*.egg-info/
+build/
+dist/
+*.egg
+
+# Frontend cache
+node_modules/.cache/
+Frontend/.pnp
+Frontend/.yarn/
+

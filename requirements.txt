@@ -67,3 +67,6 @@ typing_extensions==4.15.0
 tzdata==2026.2
 uvicorn==0.47.0
 alembic==1.17.2
+gunicorn
+python-dotenv
+openai

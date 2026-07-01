@@ -10,13 +10,13 @@ import { clearAnalysisState, setPendingFile } from "@/lib/analysis-store";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Signal — AI Resume & Job Matching" },
+      { title: "CareerLens — Semantic Job Recommendation Engine" },
       {
         name: "description",
         content:
           "Upload your resume and receive ranked, explainable job recommendations with concrete suggestions to strengthen each application.",
       },
-      { property: "og:title", content: "Signal — AI Resume & Job Matching" },
+      { property: "og:title", content: "CareerLens — Semantic Job Recommendation Engine" },
       {
         property: "og:description",
         content:
@@ -49,7 +49,7 @@ function Landing() {
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
             <p className="font-mono-tabular mb-5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Resume intelligence · v1.0
+              CareerLens · v1.0
             </p>
             <h1 className="text-balance text-5xl font-semibold tracking-tight md:text-6xl">
               The professional bridge between talent and role.
