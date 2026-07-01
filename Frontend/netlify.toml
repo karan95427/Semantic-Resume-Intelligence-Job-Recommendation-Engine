@@ -14,4 +14,4 @@
 
 [env]
   [env.production]
-    VITE_API_BASE_URL = "carrerlens-production.up.railway.app"
+    VITE_API_BASE_URL = "https://carrerlens-production.up.railway.app"
